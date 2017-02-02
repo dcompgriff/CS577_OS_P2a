@@ -10,59 +10,97 @@
 
 #include <stdio.h>
 #include <stdlib.h>
-
-#include <stdio.h>
-#include <stdlib.h>
 #include <string.h>
 #include <errno.h>
 #include <unistd.h>
 #include <ctype.h>
 
+#define LINE_SIZE 257
+
+/**
+ * Shell built-in function headers.
+ * */
+
+
+/**
+ * Function for executing child processes header.
+ * */
+
+
+
 int main(int argc, char* argv[]) {
 
+	//Option chars
 	char c;
-	int reverse_sort = -1;
-	int print_number_lines = -1;
+	//Input file name
+	char* fileName;
+	//File pointer
+	FILE *fp;
+	//Input line string
+	char lineInput[LINE_SIZE];
+	//Tokenized string vars
+	int numTokens = 0;
+	//At max, a token for each character. Could be reduced since < LINE_SIZE/2 tokens based on whitespace are possible.
+	char* tokStr[LINE_SIZE];
+	//Processing flags.
+	int isInteractive = 0;
+	int isFile = 0;
 
-	//Read in command line options, and set corresponding flags.
-	while ((c = getopt (argc, argv, "rn::")) != -1){
-		int i = 0;
-		switch (c){
-			case 'r':
-				//Reverse sorting order.
-				reverse_sort = 1;
-				break;
-			case 'n':
-				//Convert option value to number. (Returns 0 if invalid conversion)
-				while(optarg[i] != '\0'){
-					if(!isdigit(optarg[i])){
-						fprintf(stderr, "Option n error, not a number.\n");
-						return 1;
-					}else{
-						i++;
-					}
-				}
-
-				print_number_lines = atoi(optarg);
-				//If invalid argument, return negative.
-				if(print_number_lines < 0){
-					fprintf(stderr, "Option error `-%d'.\n", print_number_lines);
-					return 1;
-				}
-				break;
-			case '?':
-				//Unknown option encountered.
-				if(isprint(optopt)){
-					fprintf(stderr, "Unknown option `-%c'.\n", optopt);
-				}else{
-					fprintf(stderr,"Unknown option character `\\x%x'.\n", optopt);
-				}
-				//Return with exit error.
+	if(isatty(fileno(stdin)) && argc == 1){
+		//Go to interactive mode.
+		isInteractive = 1;
+		fp = stdin;
+		printf("sqysh$ ");
+	}else{
+		if(argc > 1){
+			fp = fopen(argv[1] , "r");
+			if(!fp){
+				fprintf(stderr,"File not found '%s'.\n", fileName);
 				return 1;
-			default:
-				abort();
-		  }
+			}
+			isFile = 1;
+			printf("fp is file.");
+		}else{
+			fp = stdin;
+			printf("fp is stdin.");
+		}
 	}
 
+	//While EOF not yet reached.
+	while(fgets(lineInput, LINE_SIZE, fp) != NULL){
+
+		//Parse input command into white space delimited words.
+		numTokens = 0;
+		tokStr[numTokens] = strtok(lineInput, " \t\n\v\f\r");
+		numTokens += 1;
+		printf("Token: \'%s\'\n", tokStr[numTokens - 1]);
+		while((tokStr[numTokens] = strtok(NULL, " \t\n\v\f\r")) != NULL){
+			numTokens += 1;
+			printf("Token: \'%s\'\n", tokStr[numTokens - 1]);
+		}
+		printf("Num tok: %d\n", numTokens);
+
+		//If shell command (cd, bg(list alive background processes), pwd, exit), call shell functions.
+
+		//If not shell command:
+		//Read arguments until '<', or '>' is found. If found, perform I/O redirection preparations.
+		//Read last argument and check to see if '&'.
+		//Call child process execute function, and 1) call wait_pid() if no '&', or 2) don't call wait_pid(), and simply monitor when process has completed.
+
+		//Perform background process (zombie) cleanup before providing next prompt.
+		//	*Use waitpid() with WNOHANG to check if any of your currently-running background processes have exited
+		//TODO: May need to keep array of proc structs with original cmd name, proc pid, and proc pointer.
+
+		//Before reading the next input, output a prompt.
+		if(isInteractive){
+			printf("\nsqysh$ ");
+		}
+	}
+
+	//Close the file if a file was used as input.
+	if(isFile){
+		fclose(fp);
+		printf("file closed.");
+	}
 	return EXIT_SUCCESS;
 }
