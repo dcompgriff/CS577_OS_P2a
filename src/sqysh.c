@@ -14,6 +14,7 @@
 #include <errno.h>
 #include <unistd.h>
 #include <ctype.h>
+#include <dirent.h>
 
 #define LINE_SIZE 257
 
@@ -78,14 +79,53 @@ int main(int argc, char* argv[]) {
 			numTokens += 1;
 			printf("Token: \'%s\'\n", tokStr[numTokens - 1]);
 		}
-		printf("Num tok: %d\n", numTokens);
+		if(tokStr[0] == NULL){
+			printf("\nsqysh$ ");
+			continue;
+		}
 
 		//If shell command (cd, bg(list alive background processes), pwd, exit), call shell functions.
-
-		//If not shell command:
-		//Read arguments until '<', or '>' is found. If found, perform I/O redirection preparations.
-		//Read last argument and check to see if '&'.
-		//Call child process execute function, and 1) call wait_pid() if no '&', or 2) don't call wait_pid(), and simply monitor when process has completed.
+		if(strcmp(tokStr[0], "cd") == 0){
+			if(numTokens > 2){
+				fprintf(stderr, "cd: too many arguments\n");
+			}
+			//Call chdir function.
+			if(!chdir(tokStr[1])){
+				fprintf(stderr, "cd: %s: %s\n", tokStr[1], strerror(errno));
+			}
+		}else if(strcmp(tokStr[0], "pwd") == 0){
+			//Call pwd function.
+			char* dir = get_current_dir_name();
+			printf("%s", dir);
+		}else if(strcmp(tokStr[0], "exit") == 0){
+			//Exit the process.
+			if(isFile){
+				fclose(fp);
+			}
+			exit(1);
+		}else if(strcmp(tokStr[0], "bg") == 0){
+			//List all bg processes that are still alive, with job index, cmd name, and pid.
+		}else if(strcmp(tokStr[0], "ls") == 0){
+			//List files in current dir, or dir passed in.
+			DIR *d;
+			struct dirent *dir;
+			if(numTokens > 1){
+				d = opendir(tokStr[1]);
+			}else{
+				d = opendir(".");
+			}
+			if(d){
+				while ((dir = readdir(d)) != NULL){
+					printf("%s\n", dir->d_name);
+				}
+				closedir(d);
+			}
+		}else{
+			//If not shell command:
+			//Read arguments until '<', or '>' is found. If found, perform I/O redirection preparations.
+			//Read last argument and check to see if '&'.
+			//Call child process execute function, and 1) call wait_pid() if no '&', or 2) don't call wait_pid(), and simply monitor when process has completed.
+		}
 
 		//Perform background process (zombie) cleanup before providing next prompt.
 		//	*Use waitpid() with WNOHANG to check if any of your currently-running background processes have exited
