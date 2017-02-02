@@ -18,14 +18,16 @@
 
 #define LINE_SIZE 257
 
-/**
- * Shell built-in function headers.
- * */
-
+//My process structure used to keep track of information about the process.
+struct _mproc_struct{
+	pid_t pid;
+	char* command;
+}mproc_struct;
 
 /**
  * Function for executing child processes header.
  * */
+mproc_struct* execChild(char* command, char* inputFile, char* outputFile, int isBackgroundTask);
 
 
 
@@ -82,6 +84,9 @@ int main(int argc, char* argv[]) {
 		hasInputFile = 0;
 		hasOutputFile = 0;
 		isBackgroundTask = 0;
+		inputFile = NULL;
+		outputFile = NULL;
+		mproc_struct* childProcess = NULL;
 
 		//Parse input command into white space delimited words.
 		numTokens = 0;
@@ -158,7 +163,7 @@ int main(int argc, char* argv[]) {
 				isBackgroundTask = 1;
 			}
 			//Call child process execute function, and 1) call wait_pid() if no '&', or 2) don't call wait_pid(), and simply monitor when process has completed.
-		  
+			childProcess = execChild(lineInput, inputFile, outputFile, isBackgroundTask);
 		}
 
 		//Perform background process (zombie) cleanup before providing next prompt.
@@ -177,4 +182,17 @@ int main(int argc, char* argv[]) {
 		printf("file closed.");
 	}
 	return EXIT_SUCCESS;
+}
+
+
+
+
+/**
+ * Call fork, exec commands to create either a subchild to wait for, or a subchild to run in the background.
+ * */
+mproc_struct* execChild(char* command, char* inputFile, char* outputFile, int isBackgroundTask){
+
+
+
+	return NULL;
 }
