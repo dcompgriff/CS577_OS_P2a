@@ -31,6 +31,8 @@
 
 int main(int argc, char* argv[]) {
 
+	//Counter var
+	int i = 0;
 	//Option chars
 	char c;
 	//Input file name
@@ -46,6 +48,13 @@ int main(int argc, char* argv[]) {
 	//Processing flags.
 	int isInteractive = 0;
 	int isFile = 0;
+	//Shell command input/output file commands.
+	int hasInputFile = 0;
+	int hasOutputFile = 0;
+	char* inputFile;
+	char* outputFile;
+	//Flag for background task.
+	int isBackgroundTask = 0;
 
 	if(isatty(fileno(stdin)) && argc == 1){
 		//Go to interactive mode.
@@ -69,6 +78,10 @@ int main(int argc, char* argv[]) {
 
 	//While EOF not yet reached.
 	while(fgets(lineInput, LINE_SIZE, fp) != NULL){
+		//Reset flag variables.
+		hasInputFile = 0;
+		hasOutputFile = 0;
+		isBackgroundTask = 0;
 
 		//Parse input command into white space delimited words.
 		numTokens = 0;
@@ -88,6 +101,10 @@ int main(int argc, char* argv[]) {
 		if(strcmp(tokStr[0], "cd") == 0){
 			if(numTokens > 2){
 				fprintf(stderr, "cd: too many arguments\n");
+			}
+			//If no argument called, switch to "$HOME" dir.
+			if(numTokens == 1){
+				chdir(getenv("HOME"));
 			}
 			//Call chdir function.
 			if(!chdir(tokStr[1])){
@@ -121,10 +138,27 @@ int main(int argc, char* argv[]) {
 				closedir(d);
 			}
 		}else{
-			//If not shell command:
 			//Read arguments until '<', or '>' is found. If found, perform I/O redirection preparations.
+			i = 1;
+			while(i < numTokens){
+				if(strcmp("<", tokStr[i]) == 0){
+					hasInputFile = 1;
+					inputFile = tokStr[i+1];
+					i += 2;
+				}else if(strcmp(">", tokStr[i]) == 0){
+					hasOutputFile = 1;
+					outputFile = tokStr[i+1];
+					i += 2;
+				}else{
+					i += 1;
+				}
+			}
 			//Read last argument and check to see if '&'.
+			if(strcmp("&", tokStr[numTokens - 1]) == 0){
+				isBackgroundTask = 1;
+			}
 			//Call child process execute function, and 1) call wait_pid() if no '&', or 2) don't call wait_pid(), and simply monitor when process has completed.
+		  
 		}
 
 		//Perform background process (zombie) cleanup before providing next prompt.
