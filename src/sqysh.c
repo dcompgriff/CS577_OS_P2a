@@ -15,19 +15,21 @@
 #include <unistd.h>
 #include <ctype.h>
 #include <dirent.h>
+#include <sys/types.h>
+#include <sys/wait.h>
 
 #define LINE_SIZE 257
 
 //My process structure used to keep track of information about the process.
-struct _mproc_struct{
+typedef struct _mproc_struct{
 	pid_t pid;
-	char* command;
+    char command[LINE_SIZE];
 }mproc_struct;
 
 /**
  * Function for executing child processes header.
  * */
-mproc_struct* execChild(char* command, char* inputFile, char* outputFile, int isBackgroundTask);
+mproc_struct* execChild(char* tokStr[], int numTokens, char* inputFile, char* outputFile, int isBackgroundTask);
 
 
 
@@ -87,15 +89,16 @@ int main(int argc, char* argv[]) {
 		inputFile = NULL;
 		outputFile = NULL;
 		mproc_struct* childProcess = NULL;
+		int childStatus;
 
 		//Parse input command into white space delimited words.
 		numTokens = 0;
 		tokStr[numTokens] = strtok(lineInput, " \t\n\v\f\r");
 		numTokens += 1;
-		printf("Token: \'%s\'\n", tokStr[numTokens - 1]);
+		//printf("Token: \'%s\'\n", tokStr[numTokens - 1]);
 		while((tokStr[numTokens] = strtok(NULL, " \t\n\v\f\r")) != NULL){
 			numTokens += 1;
-			printf("Token: \'%s\'\n", tokStr[numTokens - 1]);
+			//printf("Token: \'%s\'\n", tokStr[numTokens - 1]);
 		}
 		if(tokStr[0] == NULL){
 			printf("\nsqysh$ ");
@@ -127,21 +130,6 @@ int main(int argc, char* argv[]) {
 			exit(1);
 		}else if(strcmp(tokStr[0], "bg") == 0){
 			//List all bg processes that are still alive, with job index, cmd name, and pid.
-		}else if(strcmp(tokStr[0], "ls") == 0){
-			//List files in current dir, or dir passed in.
-			DIR *d;
-			struct dirent *dir;
-			if(numTokens > 1){
-				d = opendir(tokStr[1]);
-			}else{
-				d = opendir(".");
-			}
-			if(d){
-				while ((dir = readdir(d)) != NULL){
-					printf("%s\n", dir->d_name);
-				}
-				closedir(d);
-			}
 		}else{
 			//Read arguments until '<', or '>' is found. If found, perform I/O redirection preparations.
 			i = 1;
@@ -163,12 +151,21 @@ int main(int argc, char* argv[]) {
 				isBackgroundTask = 1;
 			}
 			//Call child process execute function, and 1) call wait_pid() if no '&', or 2) don't call wait_pid(), and simply monitor when process has completed.
-			childProcess = execChild(lineInput, inputFile, outputFile, isBackgroundTask);
+			childProcess = execChild(tokStr, numTokens, inputFile, outputFile, isBackgroundTask);
+
+			if(!isBackgroundTask && childProcess != NULL){
+			    //printf("Call to wait for child pid.\n");
+				waitpid(childProcess->pid, &childStatus, 0);
+				//printf("Child returned with status: %d\n", childStatus);
+			}
 		}
+
+
 
 		//Perform background process (zombie) cleanup before providing next prompt.
 		//	*Use waitpid() with WNOHANG to check if any of your currently-running background processes have exited
 		//TODO: May need to keep array of proc structs with original cmd name, proc pid, and proc pointer.
+		//Remember to free the mproc_struct!
 
 		//Before reading the next input, output a prompt.
 		if(isInteractive){
@@ -190,9 +187,65 @@ int main(int argc, char* argv[]) {
 /**
  * Call fork, exec commands to create either a subchild to wait for, or a subchild to run in the background.
  * */
-mproc_struct* execChild(char* command, char* inputFile, char* outputFile, int isBackgroundTask){
+mproc_struct* execChild(char* tokStr[], int numTokens, char* inputFile, char* outputFile, int isBackgroundTask){
 
+    //Create a new process structure.
+    mproc_struct* newProcess = (mproc_struct*)malloc(sizeof(mproc_struct));
 
+    //Call fork.
+    pid_t cpid = fork();
+    if(cpid == -1){
+		printf("Fork error.\n");
+		free(newProcess);
+		return NULL;
+    }
+    if(cpid == 0){
+    	//Process is the child process, so do child process stuff.
+	    FILE* inputFileDescriptor;
+	    FILE* outputFileDescriptor;
+	    if(inputFile != NULL){
+			inputFileDescriptor = fopen(inputFile, "r");
+			dup2(fileno(inputFileDescriptor), STDIN_FILENO);
+			fclose(inputFileDescriptor);
+	    }
+	    if(outputFile != NULL){
+			outputFileDescriptor = fopen(outputFile, "w");
+			dup2(fileno(outputFileDescriptor), STDOUT_FILENO);
+			fclose(outputFileDescriptor);
+	    }
+	    //Determine the arguments to pass to the program.
+	    char* tokArg[LINE_SIZE];
+	    //Initialize tokArg for when no options are passed.
+	    tokArg[0] = tokStr[0];
+	    int i;
+	    for(i = 1; i < numTokens; i++){
+			//Parse command arguments.
+			if(strcmp(">",tokStr[i]) == 0){
+				tokArg[i] = NULL;
+				break;
+			}else if(strcmp("<", tokStr[i]) == 0){
+				tokArg[i] = NULL;
+				break;
+			}else if(strcmp("&", tokStr[i]) == 0){
+				tokArg[i] = NULL;
+				break;
+			}else{
+				tokArg[i] = tokStr[i];
+			}
+	    }
+	    //Null terminate the tokArg list.
+	    tokArg[i] = NULL;
 
-	return NULL;
+		//Execute the desired program.
+		if(execvp(tokStr[0], tokArg)){
+			printf("Error on execvp.");
+			free(newProcess);
+			return NULL;
+		}
+    }else{
+		//Process is the parent process, so do parent process stuff.
+		newProcess->pid = cpid;
+		strncpy(newProcess->command, tokStr[0], LINE_SIZE);
+		return newProcess;
+    }
 }
