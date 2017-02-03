@@ -161,10 +161,10 @@ int main(int argc, char* argv[]) {
 			if(!isBackgroundTask && childProcess != NULL){
 			    //printf("Call to wait for child pid.\n");
 				waitpid(childProcess->pid, &childStatus, 0);
-				//printf("Child returned with status: %d\n", childStatus);
+				fprintf(stderr, "[%s (%d) completed with status %d]\n", tokStr[0], childProcess->pid, childStatus);
+				free(childProcess);
 			}
 		}
-
 
 
 		//Perform background process (zombie) cleanup before providing next prompt.
