@@ -7,14 +7,19 @@
  Description : Hello World in C, Ansi-style
  ============================================================================
  */
-
+//Basic program libs.
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
 #include <errno.h>
 #include <unistd.h>
-#include <ctype.h>
-#include <dirent.h>
+
+//For the open() call.
+#include <sys/types.h>
+#include <sys/stat.h>
+#include <fcntl.h>
+
+//For wait commands.
 #include <sys/types.h>
 #include <sys/wait.h>
 
@@ -201,17 +206,24 @@ mproc_struct* execChild(char* tokStr[], int numTokens, char* inputFile, char* ou
     }
     if(cpid == 0){
     	//Process is the child process, so do child process stuff.
-	    FILE* inputFileDescriptor;
-	    FILE* outputFileDescriptor;
+	    int inputFileDescriptor;
+	    int outputFileDescriptor;
+
 	    if(inputFile != NULL){
-			inputFileDescriptor = fopen(inputFile, "r");
-			dup2(fileno(inputFileDescriptor), STDIN_FILENO);
-			fclose(inputFileDescriptor);
+	    	//Open file for input.
+			inputFileDescriptor = open(inputFile, O_RDONLY);
+			//Make fd 0 point to the input file.
+			dup2(inputFileDescriptor, STDIN_FILENO);
+			//Close the previous file descriptor.
+			close(inputFileDescriptor);
 	    }
 	    if(outputFile != NULL){
-			outputFileDescriptor = fopen(outputFile, "w");
-			dup2(fileno(outputFileDescriptor), STDOUT_FILENO);
-			fclose(outputFileDescriptor);
+	    	//Open file for output.
+			outputFileDescriptor = open(outputFile, O_WRONLY|O_CREAT|O_TRUNC, 0644);
+			//Make fd output point to the output file.
+			dup2(outputFileDescriptor, STDOUT_FILENO);
+			//Close the previous file descriptor.
+			close(outputFileDescriptor);
 	    }
 	    //Determine the arguments to pass to the program.
 	    char* tokArg[LINE_SIZE];
