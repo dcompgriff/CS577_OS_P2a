@@ -23,6 +23,9 @@
 #include <sys/types.h>
 #include <sys/wait.h>
 
+//For the prctl() function for child to ask for kill signal from kernel when parent process is killed.
+#include <sys/prctl.h>
+
 #define LINE_SIZE 257
 
 //My process structure used to keep track of information about the process.
@@ -64,6 +67,13 @@ int main(int argc, char* argv[]) {
 	char* outputFile;
 	//Flag for background task.
 	int isBackgroundTask = 0;
+	//Dynamically allocated list for bg processes.
+	int bgProcListSize = 1;
+	int bgProcListNoFree;
+	mproc_struct** bgProcList = (mproc_struct**)malloc(bgProcListSize*sizeof(mproc_struct*));
+	for(i = 0; i<bgProcListSize; i++){
+		bgProcList[i] = NULL;
+	}
 
 	if(isatty(fileno(stdin)) && argc == 1){
 		//Go to interactive mode.
@@ -78,10 +88,8 @@ int main(int argc, char* argv[]) {
 				return 1;
 			}
 			isFile = 1;
-			printf("fp is file.");
 		}else{
 			fp = stdin;
-			printf("fp is stdin.");
 		}
 	}
 
@@ -135,6 +143,12 @@ int main(int argc, char* argv[]) {
 			exit(1);
 		}else if(strcmp(tokStr[0], "bg") == 0){
 			//List all bg processes that are still alive, with job index, cmd name, and pid.
+			for(i=0; i < bgProcListSize; i++){
+				pid_t tempPid = 0;
+				if(bgProcList[i] != NULL){
+					printf("[%s (%d) is running.]\n", bgProcList[i]->command, (int) bgProcList[i]->pid);
+				}
+			}
 		}else{
 			//Read arguments until '<', or '>' is found. If found, perform I/O redirection preparations.
 			i = 1;
@@ -157,12 +171,31 @@ int main(int argc, char* argv[]) {
 			}
 			//Call child process execute function, and 1) call wait_pid() if no '&', or 2) don't call wait_pid(), and simply monitor when process has completed.
 			childProcess = execChild(tokStr, numTokens, inputFile, outputFile, isBackgroundTask);
-
+			//Wait for fg task to complete.
 			if(!isBackgroundTask && childProcess != NULL){
-			    //printf("Call to wait for child pid.\n");
 				waitpid(childProcess->pid, &childStatus, 0);
 				fprintf(stderr, "[%s (%d) completed with status %d]\n", tokStr[0], childProcess->pid, childStatus);
 				free(childProcess);
+			}
+			//Add bg task to mproc_struct list in open spot, or increase proc. list size and add it then.
+			if(isBackgroundTask && childProcess != NULL){
+				bgProcListNoFree = 1;
+				for(i=0; i < bgProcListSize; i++){
+					if(bgProcList[i] == NULL){
+						bgProcList[i] = childProcess;
+						bgProcListNoFree = 0;
+						break;
+					}
+				}
+				//If no free spaces, increase proc list size by 10, and add process to the first open space.
+				if(bgProcListNoFree){
+					bgProcList = (mproc_struct**)realloc(bgProcList, (bgProcListSize + 10)*sizeof(mproc_struct*));
+					for(i = bgProcListSize; i < bgProcListSize + 10; i++){
+						bgProcList[i] = NULL;
+					}
+					bgProcList[bgProcListSize] = childProcess;
+					bgProcListSize += 10;
+				}
 			}
 		}
 
@@ -171,6 +204,22 @@ int main(int argc, char* argv[]) {
 		//	*Use waitpid() with WNOHANG to check if any of your currently-running background processes have exited
 		//TODO: May need to keep array of proc structs with original cmd name, proc pid, and proc pointer.
 		//Remember to free the mproc_struct!
+		for(i=0; i < bgProcListSize; i++){
+			pid_t tempPid = 0;
+			if(bgProcList[i] != NULL){
+				//Call waitpid(lkdfj, WNOHANG)
+				tempPid = waitpid(bgProcList[i]->pid, &childStatus, WNOHANG);
+				//If bg process finished, then print process output to stderr.
+				if (tempPid == -1){
+					fprintf(stderr, "Error calling waitpid for process %d\n", bgProcList[i]->pid);
+				}else if(tempPid == bgProcList[i]->pid){
+					//Child finished, so print finish message, free mproc_struc mem, and set bgProcList to NULL.
+					fprintf(stderr, "[%s (%d) completed with status %d]\n", bgProcList[i]->command, bgProcList[i]->pid, childStatus);
+					free(bgProcList[i]);
+					bgProcList[i] = NULL;
+				}
+			}
+		}
 
 		//Before reading the next input, output a prompt.
 		if(isInteractive){
@@ -183,6 +232,16 @@ int main(int argc, char* argv[]) {
 		fclose(fp);
 		printf("file closed.");
 	}
+
+	//Free any bg mproc_struct memory that is currently being used.
+	for(i=0; i<bgProcListSize; i++){
+		if(bgProcList[i] != NULL){
+			free(bgProcList[i]);
+		}
+	}
+	//Free the pointer list to mproc_struc memory.
+	free(bgProcList);
+
 	return EXIT_SUCCESS;
 }
 
@@ -248,6 +307,8 @@ mproc_struct* execChild(char* tokStr[], int numTokens, char* inputFile, char* ou
 	    //Null terminate the tokArg list.
 	    tokArg[i] = NULL;
 
+	    //Ask kernel to send SIGHUP signal to this child when the parent process dies.
+	    prctl(PR_SET_PDEATHSIG, SIGHUP);
 		//Execute the desired program.
 		if(execvp(tokStr[0], tokArg)){
 			printf("Error on execvp.");
