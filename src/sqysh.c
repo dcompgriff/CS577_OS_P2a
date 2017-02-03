@@ -68,7 +68,7 @@ int main(int argc, char* argv[]) {
 	//Flag for background task.
 	int isBackgroundTask = 0;
 	//Dynamically allocated list for bg processes.
-	int bgProcListSize = 1;
+	int bgProcListSize = 10;
 	int bgProcListNoFree;
 	mproc_struct** bgProcList = (mproc_struct**)malloc(bgProcListSize*sizeof(mproc_struct*));
 	for(i = 0; i<bgProcListSize; i++){
