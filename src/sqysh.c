@@ -45,10 +45,6 @@ int main(int argc, char* argv[]) {
 
 	//Counter var
 	int i = 0;
-	//Option chars
-	char c;
-	//Input file name
-	char* fileName;
 	//File pointer
 	FILE *fp;
 	//Input line string
@@ -61,8 +57,6 @@ int main(int argc, char* argv[]) {
 	int isInteractive = 0;
 	int isFile = 0;
 	//Shell command input/output file commands.
-	int hasInputFile = 0;
-	int hasOutputFile = 0;
 	char* inputFile;
 	char* outputFile;
 	//Flag for background task.
@@ -84,7 +78,7 @@ int main(int argc, char* argv[]) {
 		if(argc > 1){
 			fp = fopen(argv[1] , "r");
 			if(!fp){
-				fprintf(stderr,"File not found '%s'.\n", fileName);
+				fprintf(stderr,"File not found '%s'.\n", argv[1]);
 				return 1;
 			}
 			isFile = 1;
@@ -96,8 +90,6 @@ int main(int argc, char* argv[]) {
 	//While EOF not yet reached.
 	while(fgets(lineInput, LINE_SIZE, fp) != NULL){
 		//Reset flag variables.
-		hasInputFile = 0;
-		hasOutputFile = 0;
 		isBackgroundTask = 0;
 		inputFile = NULL;
 		outputFile = NULL;
@@ -135,18 +127,28 @@ int main(int argc, char* argv[]) {
 			}
 		}else if(strcmp(tokStr[0], "pwd") == 0){
 			//Call pwd function.
-			char* dir = get_current_dir_name();
+			size_t dirLength = 2000;
+			char* dir = (char*)malloc(dirLength*sizeof(char));
+			getcwd(dir, dirLength);
 			printf("%s", dir);
+			free(dir);
 		}else if(strcmp(tokStr[0], "exit") == 0){
 			//Exit the process.
 			if(isFile){
 				fclose(fp);
 			}
+			//Free any bg mproc_struct memory that is currently being used.
+			for(i=0; i<bgProcListSize; i++){
+				if(bgProcList[i] != NULL){
+					free(bgProcList[i]);
+				}
+			}
+			//Free the pointer list to mproc_struc memory.
+			free(bgProcList);
 			exit(1);
 		}else if(strcmp(tokStr[0], "bg") == 0){
 			//List all bg processes that are still alive, with job index, cmd name, and pid.
 			for(i=0; i < bgProcListSize; i++){
-				pid_t tempPid = 0;
 				if(bgProcList[i] != NULL){
 					printf("[%s (%d) is running.]\n", bgProcList[i]->command, (int) bgProcList[i]->pid);
 				}
@@ -156,11 +158,9 @@ int main(int argc, char* argv[]) {
 			i = 1;
 			while(i < numTokens){
 				if(strcmp("<", tokStr[i]) == 0){
-					hasInputFile = 1;
 					inputFile = tokStr[i+1];
 					i += 2;
 				}else if(strcmp(">", tokStr[i]) == 0){
-					hasOutputFile = 1;
 					outputFile = tokStr[i+1];
 					i += 2;
 				}else{
@@ -311,8 +311,9 @@ mproc_struct* execChild(char* tokStr[], int numTokens, char* inputFile, char* ou
 		if(execvp(tokStr[0], tokArg)){
 			printf("Error on execvp.");
 			free(newProcess);
-			return NULL;
 		}
+		//Only reached if error.
+		return NULL;
     }else{
 		//Process is the parent process, so do parent process stuff.
 		newProcess->pid = cpid;
