@@ -125,7 +125,9 @@ int main(int argc, char* argv[]) {
 			}
 			//If no argument called, switch to "$HOME" dir.
 			if(numTokens == 1){
-				chdir(getenv("HOME"));
+			    if(!chdir(getenv("HOME"))){
+				fprintf(stderr, "cd: HOME: %s\n", strerror(errno));
+			    }
 			}
 			//Call chdir function.
 			if(!chdir(tokStr[1])){
@@ -174,7 +176,7 @@ int main(int argc, char* argv[]) {
 			//Wait for fg task to complete.
 			if(!isBackgroundTask && childProcess != NULL){
 				waitpid(childProcess->pid, &childStatus, 0);
-				fprintf(stderr, "[%s (%d) completed with status %d]\n", tokStr[0], childProcess->pid, childStatus);
+				//fprintf(stderr, "[%s (%d) completed with status %d]\n", tokStr[0], childProcess->pid, childStatus);
 				free(childProcess);
 			}
 			//Add bg task to mproc_struct list in open spot, or increase proc. list size and add it then.
@@ -230,7 +232,6 @@ int main(int argc, char* argv[]) {
 	//Close the file if a file was used as input.
 	if(isFile){
 		fclose(fp);
-		printf("file closed.");
 	}
 
 	//Free any bg mproc_struct memory that is currently being used.
@@ -306,9 +307,6 @@ mproc_struct* execChild(char* tokStr[], int numTokens, char* inputFile, char* ou
 	    }
 	    //Null terminate the tokArg list.
 	    tokArg[i] = NULL;
-
-	    //Ask kernel to send SIGHUP signal to this child when the parent process dies.
-	    prctl(PR_SET_PDEATHSIG, SIGHUP);
 		//Execute the desired program.
 		if(execvp(tokStr[0], tokArg)){
 			printf("Error on execvp.");
