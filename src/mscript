@@ -1,0 +1,95 @@
+find ../../../ mysort > output1 &
+find ../../../ mysort > output2 &
+find ../../../ mysort > output3 &
+find ../../../ mysort > output4 &
+find ../../../ mysort > output5 &
+find ../../../ mysort > output6 &
+find ../../../ mysort > output7 &
+find ../../../ mysort > output8 &
+find ../../../ mysort > output9 &
+find ../../../ mysort > output10 &
+find ../../../ mysort > output11 &
+find ../../../ mysort > output12 &
+find ../../../ mysort > output13 &
+find ../../../ mysort > output14 &
+find ../../../ mysort > output15 &
+find ../../../ mysort > output16 &
+find ../../../ mysort > output17 &
+find ../../../ mysort > output18 &
+find ../../../ mysort > output19 &
+find ../../../ mysort > output20 &
+find ../../../ mysort > output21 &
+find ../../../ mysort > output21 &
+find ../../../ mysort > output32 &
+find ../../../ mysort > output43 &
+find ../../../ mysort > output54 &
+find ../../../ mysort > output65 &
+find ../../../ mysort > output76 &
+find ../../../ mysort > output87 &
+find ../../../ mysort > output98 &
+find ../../../ mysort > output109 &
+find ../../../ mysort > output200 &
+
+
+find ../../../ mysort > output1 &
+find ../../../ mysort > output2 &
+find ../../../ mysort > output3 &
+find ../../../ mysort > output4 &
+find ../../../ mysort > output5 &
+find ../../../ mysort > output6 &
+find ../../../ mysort > output7 &
+find ../../../ mysort > output8 &
+find ../../../ mysort > output9 &
+find ../../../ mysort > output10 &
+
+sleep 2
+
+find ../../../ mysort > output11 &
+find ../../../ mysort > output12 &
+find ../../../ mysort > output13 &
+find ../../../ mysort > output14 &
+find ../../../ mysort > output15 &
+find ../../../ mysort > output16 &
+find ../../../ mysort > output17 &
+find ../../../ mysort > output18 &
+find ../../../ mysort > output19 &
+find ../../../ mysort > output20 &
+
+sleep 2
+find ../../../ mysort > output20 &
+
+sleep 4
+
+find ../../../ mysort > output1 &
+find ../../../ mysort > output2 &
+find ../../../ mysort > output3 &
+find ../../../ mysort > output4 &
+find ../../../ mysort > output5 &
+find ../../../ mysort > output6 &
+find ../../../ mysort > output7 &
+find ../../../ mysort > output8 &
+find ../../../ mysort > output9 &
+find ../../../ mysort > output10 &
+find ../../../ mysort > output11 &
+find ../../../ mysort > output12 &
+find ../../../ mysort > output13 &
+find ../../../ mysort > output14 &
+find ../../../ mysort > output15 &
+find ../../../ mysort > output16 &
+find ../../../ mysort > output17 &
+find ../../../ mysort > output18 &
+find ../../../ mysort > output19 &
+find ../../../ mysort > output20 &
+find ../../../ mysort > output21 &
+find ../../../ mysort > output21 &
+find ../../../ mysort > output32 &
+find ../../../ mysort > output43 &
+find ../../../ mysort > output54 &
+find ../../../ mysort > output65 &
+find ../../../ mysort > output76 &
+find ../../../ mysort > output87 &
+find ../../../ mysort > output98 &
+find ../../../ mysort > output109 &
+find ../../../ mysort > output200 &
+
+sleep 10

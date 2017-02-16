@@ -27,7 +27,7 @@
 #include <sys/prctl.h>
 
 //Typical bash line size limit.
-#define LINE_SIZE 350
+#define LINE_SIZE 257
 
 //My process structure used to keep track of information about the process.
 typedef struct _mproc_struct{
@@ -38,7 +38,7 @@ typedef struct _mproc_struct{
 /**
  * Function for executing child processes header.
  * */
-mproc_struct* execChild(char* tokStr[], int numTokens, char* inputFile, char* outputFile, int isBackgroundTask);
+mproc_struct* execChild(char* tokStr[], int numTokens, char* inputFile, char* outputFile, int isBackgroundTask, int* childFailFlag);
 
 
 
@@ -106,30 +106,6 @@ int main(int argc, char* argv[]) {
 		while((tokStr[numTokens] = strtok(NULL, " \t\n\v\f\r")) != NULL){
 			numTokens += 1;
 		}
-		//If "" for first tokStr, then there is an error in strtok. This bug can cause the "exit" command not to exit the prog correctly.
-		//1) Determine if tokStr[0] == NULL. If yes, then do nothing.
-//		if(tokStr[0] == NULL){
-//			//Do nothing.
-//		}else if(strcmp(tokStr[0], "") == 0){
-//			//Find first non-empty token if one exists.
-//			int i = 0;
-//			int firstNonEmptyIndex = 0;
-//			for(i=0; i<numTokens; i++){
-//				if(strcmp(tokStr[i], "") == 0){
-//					continue;
-//				}else if(firstNonEmptyIndex == 0){
-//					firstNonEmptyIndex = i;
-//				}else{
-//					//Move token back by offset.
-//					tokStr[i - firstNonEmptyIndex] = tokStr[i];
-//				}
-//			}
-//			numTokens -= firstNonEmptyIndex;
-//			//If all tokens are empty "", then set tokStr[0] = NULL.
-//			if(firstNonEmptyIndex == 0){
-//				tokStr[0] = NULL;
-//			}
-//		}
 
 		//If shell command (cd, bg(list alive background processes), pwd, exit), call shell functions.
 		if(tokStr[0] == NULL){
@@ -196,8 +172,9 @@ int main(int argc, char* argv[]) {
 				isBackgroundTask = 1;
 			}
 			//Call child process execute function, and 1) call wait_pid() if no '&', or 2) don't call wait_pid(), and simply monitor when process has completed.
-			childProcess = execChild(tokStr, numTokens, inputFile, outputFile, isBackgroundTask);
-			if(childProcess == NULL){
+			int childFail = 0;
+			childProcess = execChild(tokStr, numTokens, inputFile, outputFile, isBackgroundTask, &childFail);
+			if(childProcess == NULL && childFail == 1){
 				//Child program failed. Free memory and return from failed child fork.
 				if(isFile){
 					fclose(fp);
@@ -267,7 +244,7 @@ int main(int argc, char* argv[]) {
 				}
 			}
 		}
-		//Realloc if necessary.
+		//Realloc if few processes so that linear process search isn't too long most of the time. (Unless long running process at high address).
 		if(lastProcPosition + 1 < bgProcListSize - 15){
 			bgProcList = (mproc_struct**)realloc(bgProcList, (lastProcPosition + 1 + 10)*sizeof(mproc_struct*));
 			if(bgProcList != 0){
@@ -306,7 +283,7 @@ int main(int argc, char* argv[]) {
 /**
  * Call fork, exec commands to create either a subchild to wait for, or a subchild to run in the background.
  * */
-mproc_struct* execChild(char* tokStr[], int numTokens, char* inputFile, char* outputFile, int isBackgroundTask){
+mproc_struct* execChild(char* tokStr[], int numTokens, char* inputFile, char* outputFile, int isBackgroundTask, int* childFailFlag){
 
     //Create a new process structure.
     mproc_struct* newProcess = (mproc_struct*)malloc(sizeof(mproc_struct));
@@ -367,6 +344,7 @@ mproc_struct* execChild(char* tokStr[], int numTokens, char* inputFile, char* ou
 			free(newProcess);
 		}
 		//Only reached if error.
+		*childFailFlag = 1;
 		return NULL;
     }else{
 		//Process is the parent process, so do parent process stuff.
