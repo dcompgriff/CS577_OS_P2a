@@ -303,6 +303,14 @@ mproc_struct* execChild(char* tokStr[], int numTokens, char* inputFile, char* ou
 	    if(inputFile != NULL){
 	    	//Open file for input.
 			inputFileDescriptor = open(inputFile, O_RDONLY);
+			if(inputFileDescriptor == -1){
+				//Execute the desired program.
+				fprintf(stderr, "%s: %s\n", tokStr[0], strerror(errno));
+				free(newProcess);
+				//Only reached if error.
+				*childFailFlag = 1;
+				return NULL;
+			}
 			//Make fd 0 point to the input file.
 			dup2(inputFileDescriptor, STDIN_FILENO);
 			//Close the previous file descriptor.
@@ -311,6 +319,14 @@ mproc_struct* execChild(char* tokStr[], int numTokens, char* inputFile, char* ou
 	    if(outputFile != NULL){
 	    	//Open file for output.
 			outputFileDescriptor = open(outputFile, O_WRONLY|O_CREAT|O_TRUNC, 0644);
+			if(outputFileDescriptor == -1){
+				//Execute the desired program.
+				fprintf(stderr, "%s: %s\n", tokStr[0], strerror(errno));
+				free(newProcess);
+				//Only reached if error.
+				*childFailFlag = 1;
+				return NULL;
+			}
 			//Make fd output point to the output file.
 			dup2(outputFileDescriptor, STDOUT_FILENO);
 			//Close the previous file descriptor.
