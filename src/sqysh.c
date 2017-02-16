@@ -98,6 +98,36 @@ int main(int argc, char* argv[]) {
 		mproc_struct* childProcess = NULL;
 		int childStatus;
 
+		if(isInteractive){
+			//Do bg process check and cleanup.
+			int lastProcPosition = 0;
+			for(i=0; i < bgProcListSize; i++){
+				pid_t tempPid = 0;
+				if(bgProcList[i] != NULL){
+					//Call waitpid(lkdfj, WNOHANG)
+					tempPid = waitpid(bgProcList[i]->pid, &childStatus, WNOHANG);
+					//If bg process finished, then print process output to stderr.
+					if (tempPid == -1){
+						fprintf(stderr, "Error calling waitpid for process %d\n", bgProcList[i]->pid);
+					}else if(tempPid == bgProcList[i]->pid){
+						//Child finished, so print finish message, free mproc_struc mem, and set bgProcList to NULL.
+						fprintf(stderr, "[%s (%d) completed with status %d]\n", bgProcList[i]->command, bgProcList[i]->pid, WEXITSTATUS(childStatus));
+						free(bgProcList[i]);
+						bgProcList[i] = NULL;
+					}else if (tempPid == 0){
+						lastProcPosition = i;
+					}
+				}
+			}
+			//Realloc if few processes so that linear process search isn't too long most of the time. (Unless long running process at high address).
+			if(lastProcPosition + 1 < bgProcListSize - 15){
+				bgProcList = (mproc_struct**)realloc(bgProcList, (lastProcPosition + 1 + 10)*sizeof(mproc_struct*));
+				if(bgProcList != 0){
+					bgProcListSize = lastProcPosition + 10;
+				}
+			}
+		}
+
 		//Parse input command into white space delimited words.
 		numTokens = 0;
 		tokStr[numTokens] = strtok(lineInput, " \t\n\v\f\r");
