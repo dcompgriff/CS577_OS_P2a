@@ -222,10 +222,7 @@ int main(int argc, char* argv[]) {
 
 			//Wait for fg task to complete.
 			if(!isBackgroundTask && childProcess != NULL){
-				pid_t currentProcPid = waitpid(childProcess->pid, &childStatus, 0);
-				if(currentProcPid == -1 || currentProcPid != childProcess->pid || childStatus != 0){
-					fprintf(stderr, "[%s (%d) completed with status %d]\n", tokStr[0], currentProcPid, WEXITSTATUS(childStatus));
-				}
+				waitpid(childProcess->pid, &childStatus, 0);
 				free(childProcess);
 			}
 			//Add bg task to mproc_struct list in open spot, or increase proc. list size and add it then.
