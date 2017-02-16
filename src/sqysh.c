@@ -26,7 +26,8 @@
 //For the prctl() function for child to ask for kill signal from kernel when parent process is killed.
 #include <sys/prctl.h>
 
-#define LINE_SIZE 257
+//Typical bash line size limit.
+#define LINE_SIZE 350
 
 //My process structure used to keep track of information about the process.
 typedef struct _mproc_struct{
@@ -79,6 +80,7 @@ int main(int argc, char* argv[]) {
 			fp = fopen(argv[1] , "r");
 			if(!fp){
 				fprintf(stderr,"File not found '%s'.\n", argv[1]);
+				free(bgProcList);
 				return 1;
 			}
 			isFile = 1;
@@ -103,27 +105,49 @@ int main(int argc, char* argv[]) {
 		//printf("Token: \'%s\'\n", tokStr[numTokens - 1]);
 		while((tokStr[numTokens] = strtok(NULL, " \t\n\v\f\r")) != NULL){
 			numTokens += 1;
-			//printf("Token: \'%s\'\n", tokStr[numTokens - 1]);
 		}
-		if(tokStr[0] == NULL){
-			printf("\nsqysh$ ");
-			continue;
-		}
+		//If "" for first tokStr, then there is an error in strtok. This bug can cause the "exit" command not to exit the prog correctly.
+		//1) Determine if tokStr[0] == NULL. If yes, then do nothing.
+//		if(tokStr[0] == NULL){
+//			//Do nothing.
+//		}else if(strcmp(tokStr[0], "") == 0){
+//			//Find first non-empty token if one exists.
+//			int i = 0;
+//			int firstNonEmptyIndex = 0;
+//			for(i=0; i<numTokens; i++){
+//				if(strcmp(tokStr[i], "") == 0){
+//					continue;
+//				}else if(firstNonEmptyIndex == 0){
+//					firstNonEmptyIndex = i;
+//				}else{
+//					//Move token back by offset.
+//					tokStr[i - firstNonEmptyIndex] = tokStr[i];
+//				}
+//			}
+//			numTokens -= firstNonEmptyIndex;
+//			//If all tokens are empty "", then set tokStr[0] = NULL.
+//			if(firstNonEmptyIndex == 0){
+//				tokStr[0] = NULL;
+//			}
+//		}
 
 		//If shell command (cd, bg(list alive background processes), pwd, exit), call shell functions.
-		if(strcmp(tokStr[0], "cd") == 0){
+		if(tokStr[0] == NULL){
+			//Do nothing but re-print prompt and check background tasks.
+		}else if(strcmp(tokStr[0], "cd") == 0){
 			if(numTokens > 2){
 				fprintf(stderr, "cd: too many arguments\n");
 			}
 			//If no argument called, switch to "$HOME" dir.
 			if(numTokens == 1){
-			    if(!chdir(getenv("HOME"))){
-				fprintf(stderr, "cd: HOME: %s\n", strerror(errno));
+			    if(chdir(getenv("HOME")) != 0){
+			    	fprintf(stderr, "cd: HOME: %s\n", strerror(errno));
 			    }
-			}
-			//Call chdir function.
-			if(!chdir(tokStr[1])){
-				fprintf(stderr, "cd: %s: %s\n", tokStr[1], strerror(errno));
+			}else{
+				//Call chdir function.
+				if(chdir(tokStr[1]) != 0){
+					fprintf(stderr, "cd: %s: %s\n", tokStr[1], strerror(errno));
+				}
 			}
 		}else if(strcmp(tokStr[0], "pwd") == 0){
 			//Call pwd function.
@@ -145,7 +169,7 @@ int main(int argc, char* argv[]) {
 			}
 			//Free the pointer list to mproc_struc memory.
 			free(bgProcList);
-			exit(1);
+			exit(0);
 		}else if(strcmp(tokStr[0], "bg") == 0){
 			//List all bg processes that are still alive, with job index, cmd name, and pid.
 			for(i=0; i < bgProcListSize; i++){
@@ -153,7 +177,7 @@ int main(int argc, char* argv[]) {
 					printf("[%s (%d) is running.]\n", bgProcList[i]->command, (int) bgProcList[i]->pid);
 				}
 			}
-		}else{
+		}else {
 			//Read arguments until '<', or '>' is found. If found, perform I/O redirection preparations.
 			i = 1;
 			while(i < numTokens){
@@ -173,10 +197,28 @@ int main(int argc, char* argv[]) {
 			}
 			//Call child process execute function, and 1) call wait_pid() if no '&', or 2) don't call wait_pid(), and simply monitor when process has completed.
 			childProcess = execChild(tokStr, numTokens, inputFile, outputFile, isBackgroundTask);
+			if(childProcess == NULL){
+				//Child program failed. Free memory and return from failed child fork.
+				if(isFile){
+					fclose(fp);
+				}
+				//Free any bg mproc_struct memory that is currently being used.
+				for(i=0; i<bgProcListSize; i++){
+					if(bgProcList[i] != NULL){
+						free(bgProcList[i]);
+					}
+				}
+				//Free the pointer list to mproc_struc memory.
+				free(bgProcList);
+				exit(1);
+			}
+
 			//Wait for fg task to complete.
 			if(!isBackgroundTask && childProcess != NULL){
-				waitpid(childProcess->pid, &childStatus, 0);
-				//fprintf(stderr, "[%s (%d) completed with status %d]\n", tokStr[0], childProcess->pid, childStatus);
+				pid_t currentProcPid = waitpid(childProcess->pid, &childStatus, 0);
+				if(currentProcPid == -1 || currentProcPid != childProcess->pid || childStatus != 0){
+					fprintf(stderr, "[%s (%d) completed with status %d]\n", tokStr[0], currentProcPid, WEXITSTATUS(childStatus));
+				}
 				free(childProcess);
 			}
 			//Add bg task to mproc_struct list in open spot, or increase proc. list size and add it then.
@@ -206,6 +248,7 @@ int main(int argc, char* argv[]) {
 		//	*Use waitpid() with WNOHANG to check if any of your currently-running background processes have exited
 		//TODO: May need to keep array of proc structs with original cmd name, proc pid, and proc pointer.
 		//Remember to free the mproc_struct!
+		int lastProcPosition = 0;
 		for(i=0; i < bgProcListSize; i++){
 			pid_t tempPid = 0;
 			if(bgProcList[i] != NULL){
@@ -216,10 +259,19 @@ int main(int argc, char* argv[]) {
 					fprintf(stderr, "Error calling waitpid for process %d\n", bgProcList[i]->pid);
 				}else if(tempPid == bgProcList[i]->pid){
 					//Child finished, so print finish message, free mproc_struc mem, and set bgProcList to NULL.
-					fprintf(stderr, "[%s (%d) completed with status %d]\n", bgProcList[i]->command, bgProcList[i]->pid, childStatus);
+					fprintf(stderr, "[%s (%d) completed with status %d]\n", bgProcList[i]->command, bgProcList[i]->pid, WEXITSTATUS(childStatus));
 					free(bgProcList[i]);
 					bgProcList[i] = NULL;
+				}else if (tempPid == 0){
+					lastProcPosition = i;
 				}
+			}
+		}
+		//Realloc if necessary.
+		if(lastProcPosition + 1 < bgProcListSize - 15){
+			bgProcList = (mproc_struct**)realloc(bgProcList, (lastProcPosition + 1 + 10)*sizeof(mproc_struct*));
+			if(bgProcList != 0){
+				bgProcListSize = lastProcPosition + 10;
 			}
 		}
 
@@ -227,6 +279,10 @@ int main(int argc, char* argv[]) {
 		if(isInteractive){
 			printf("\nsqysh$ ");
 		}
+
+		//Clean lineInput string out for next input by setting the null terminator.
+		lineInput[0] = '\0';
+		tokStr[0] = NULL;
 	}
 
 	//Close the file if a file was used as input.
@@ -243,10 +299,8 @@ int main(int argc, char* argv[]) {
 	//Free the pointer list to mproc_struc memory.
 	free(bgProcList);
 
-	return EXIT_SUCCESS;
+	return 0;
 }
-
-
 
 
 /**
@@ -260,7 +314,7 @@ mproc_struct* execChild(char* tokStr[], int numTokens, char* inputFile, char* ou
     //Call fork.
     pid_t cpid = fork();
     if(cpid == -1){
-		printf("Fork error.\n");
+    	fprintf(stderr, "%s: %s\n", tokStr[0], strerror(errno));
 		free(newProcess);
 		return NULL;
     }
@@ -309,7 +363,7 @@ mproc_struct* execChild(char* tokStr[], int numTokens, char* inputFile, char* ou
 	    tokArg[i] = NULL;
 		//Execute the desired program.
 		if(execvp(tokStr[0], tokArg)){
-			printf("Error on execvp.");
+			fprintf(stderr, "%s: %s\n", tokStr[0], strerror(errno));
 			free(newProcess);
 		}
 		//Only reached if error.
