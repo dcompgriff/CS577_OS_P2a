@@ -79,7 +79,7 @@ int main(int argc, char* argv[]) {
 		if(argc > 1){
 			fp = fopen(argv[1] , "r");
 			if(!fp){
-				fprintf(stderr,"File not found '%s'.\n", argv[1]);
+				fprintf(stderr, "%s: %s\n", argv[1], strerror(errno));
 				free(bgProcList);
 				return 1;
 			}
@@ -108,7 +108,8 @@ int main(int argc, char* argv[]) {
 					tempPid = waitpid(bgProcList[i]->pid, &childStatus, WNOHANG);
 					//If bg process finished, then print process output to stderr.
 					if (tempPid == -1){
-						fprintf(stderr, "Error calling waitpid for process %d\n", bgProcList[i]->pid);
+						fprintf(stderr, "%s: %s\n", bgProcList[i]->command, strerror(errno));
+						//fprintf(stderr, "Error calling waitpid for process %d\n", bgProcList[i]->pid);
 					}else if(tempPid == bgProcList[i]->pid){
 						//Child finished, so print finish message, free mproc_struc mem, and set bgProcList to NULL.
 						fprintf(stderr, "[%s (%d) completed with status %d]\n", bgProcList[i]->command, bgProcList[i]->pid, WEXITSTATUS(childStatus));
@@ -132,7 +133,6 @@ int main(int argc, char* argv[]) {
 		numTokens = 0;
 		tokStr[numTokens] = strtok(lineInput, " \t\n\v\f\r");
 		numTokens += 1;
-		//printf("Token: \'%s\'\n", tokStr[numTokens - 1]);
 		while((tokStr[numTokens] = strtok(NULL, " \t\n\v\f\r")) != NULL){
 			numTokens += 1;
 		}
@@ -143,11 +143,10 @@ int main(int argc, char* argv[]) {
 		}else if(strcmp(tokStr[0], "cd") == 0){
 			if(numTokens > 2){
 				fprintf(stderr, "cd: too many arguments\n");
-			}
-			//If no argument called, switch to "$HOME" dir.
-			if(numTokens == 1){
+			}else if(numTokens == 1){
+				//If no argument called, switch to "$HOME" dir.
 			    if(chdir(getenv("HOME")) != 0){
-			    	fprintf(stderr, "cd: HOME: %s\n", strerror(errno));
+			    	fprintf(stderr, "cd: %s: %s\n", getenv("HOME"), strerror(errno));
 			    }
 			}else{
 				//Call chdir function.
@@ -260,7 +259,8 @@ int main(int argc, char* argv[]) {
 				tempPid = waitpid(bgProcList[i]->pid, &childStatus, WNOHANG);
 				//If bg process finished, then print process output to stderr.
 				if (tempPid == -1){
-					fprintf(stderr, "Error calling waitpid for process %d\n", bgProcList[i]->pid);
+					fprintf(stderr, "%s: %s\n", bgProcList[i]->command, strerror(errno));
+					//fprintf(stderr, "Error calling waitpid for process %d\n", bgProcList[i]->pid);
 				}else if(tempPid == bgProcList[i]->pid){
 					//Child finished, so print finish message, free mproc_struc mem, and set bgProcList to NULL.
 					fprintf(stderr, "[%s (%d) completed with status %d]\n", bgProcList[i]->command, bgProcList[i]->pid, WEXITSTATUS(childStatus));
